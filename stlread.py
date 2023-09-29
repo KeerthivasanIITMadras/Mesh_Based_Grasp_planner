@@ -5,33 +5,35 @@ import pandas as pd
 
 class KdTree:
     def __init__(self, pcd):
-        self.pcd = np.asarray(pcd.points)
-        self.radius_sweep = 20
+        self.pcd = pcd
+        self.kd_tree = o3d.geometry.KDTreeFlann(self.pcd)
+        self.radius_sweep = 40
         self.c = 0
+        self.selected_points = []
+        self.checked_points = []
 
-    def calc_distance(self, point1, point2):
-        return np.linalg.norm(point1-point2)
+    def get_points(self, center_point):
 
-    def get_remaining_points(self, point_cloud, center_point, radius):
-        remaining_points = []
-        current_points = list(center_point)
-        for point in point_cloud:
-            distance = self.calc_distance(center_point, point)
-            if distance > self.radius_sweep:
-                remaining_points.append(point)
-            else:
-                current_points.append(point)
-        return np.asarray(remaining_points), np.asarray(current_points)
+        [k, idx, _] = self.kd_tree.search_radius_vector_3d(
+            center_point, self.radius_sweep)
+        return idx
 
     def search(self):
-        selected_points = []
-        while len(self.pcd) > 0:
-            starting_point = self.pcd[[np.random.randint(0, len(self.pcd))]
-                                      ]
-            selected_points.append(starting_point)
-            self.pcd, current_points = self.get_remaining_points(
-                self.pcd, starting_point, self.radius_sweep)
-            print(len(current_points))
+        while len(self.checked_points) <= len(self.pcd.points):
+            sample_point = np.random.randint(0, len(self.pcd.points))
+            if sample_point in self.checked_points:
+                continue
+            idx = self.get_points(self.pcd.points[sample_point])
+            self.checked_points.append(sample_point)
+            for i in idx:
+                self.checked_points.append(i)
+            new_pcd = o3d.geometry.PointCloud()
+            new_pcd.points = o3d.utility.Vector3dVector(
+                np.array([np.asarray(self.pcd.points[i]) for i in idx]))
+            new_pcd.normals = o3d.utility.Vector3dVector(
+                np.array([np.asarray(self.pcd.normals[i]) for i in idx]))
+            print(len(self.checked_points))
+            visualize(new_pcd)
 
 
 def visualize(mesh):
@@ -48,7 +50,8 @@ def visualize(mesh):
     z_centroid = np.mean(points[:, 2])
     mesh_coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
         size=5, origin=[x_centroid, y_centroid, z_centroid])
-    o3d.visualization.draw_geometries([mesh_coord_frame, mesh])
+    o3d.visualization.draw_geometries(
+        [mesh_coord_frame, mesh], point_show_normal=True)
 
 
 def mesh2PointCloud(mesh):
