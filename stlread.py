@@ -1,14 +1,14 @@
 import open3d as o3d
 import numpy as np
 import pandas as pd
+from itertools import combinations
 
 
 class KdTree:
     def __init__(self, pcd):
         self.pcd = pcd
         self.kd_tree = o3d.geometry.KDTreeFlann(self.pcd)
-        self.radius_sweep = 40
-        self.c = 0
+        self.radius_sweep = 20
         self.selected_points = []
         self.checked_points = []
 
@@ -32,8 +32,29 @@ class KdTree:
                 np.array([np.asarray(self.pcd.points[i]) for i in idx]))
             new_pcd.normals = o3d.utility.Vector3dVector(
                 np.array([np.asarray(self.pcd.normals[i]) for i in idx]))
-            print(len(self.checked_points))
-            visualize(new_pcd)
+            force_optimization = Optimization(new_pcd)
+            force_optimization.recursiveLeastSquares()
+            break
+            # visualize(new_pcd)
+
+
+class Optimization:
+    def __init__(self, pcd):
+        self.pcd = pcd
+        self.max_force = 10
+        self.f_ext = np.asarray([0, 0, -10, 0, 0, 0])
+
+    def choose(self):
+        unique_combinations = np.asarray(
+            list(combinations(zip(self.pcd.points, self.pcd.normals), 3)))
+        return unique_combinations
+
+    def recursiveLeastSquares(self):
+        unique_combinations = self.choose()
+        for i, combination in enumerate(unique_combinations, start=1):
+            for point, normal in combination:
+                normal = -normal
+                pass
 
 
 def visualize(mesh):
@@ -55,7 +76,7 @@ def visualize(mesh):
 
 
 def mesh2PointCloud(mesh):
-    n_pts = 1000
+    n_pts = 100
     pcd = mesh.sample_points_uniformly(n_pts)
     return pcd
 
