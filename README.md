@@ -1,0 +1,2 @@
+# Mesh Based Grasp Planner Python interface
+<p>This project is aimed at developing a novel grasp planner which makes use of point cloud from the environment and plans grasp for 3 fingered gripper. This is still currently under development</p>
