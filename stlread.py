@@ -33,7 +33,7 @@ class KdTree:
             new_pcd.normals = o3d.utility.Vector3dVector(
                 np.array([np.asarray(self.pcd.normals[i]) for i in idx]))
             force_optimization = Optimization(new_pcd)
-            force_optimization.recursiveLeastSquares()
+            force_optimization.transformation()
             break
             # visualize(new_pcd)
 
@@ -43,18 +43,57 @@ class Optimization:
         self.pcd = pcd
         self.max_force = 10
         self.f_ext = np.asarray([0, 0, -10, 0, 0, 0])
+        # For point contact with friction
+        self.Bci = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1], [
+            0, 0, 0], [0, 0, 0], [0, 0, 0]])
 
     def choose(self):
         unique_combinations = np.asarray(
             list(combinations(zip(self.pcd.points, self.pcd.normals), 3)))
         return unique_combinations
 
-    def recursiveLeastSquares(self):
+    def transformation(self):
         unique_combinations = self.choose()
         for i, combination in enumerate(unique_combinations, start=1):
+            print("New combination")
+            G = None
             for point, normal in combination:
-                normal = -normal
-                pass
+                # This gives us orientation of normal vector with x,y and z axis
+                x_axis_angle = np.arctan2(np.linalg.norm(np.cross(
+                    normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([1, 0, 0])))
+                y_axis_angle = np.arctan2(np.linalg.norm(np.cross(
+                    normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([0, 1, 0])))
+                z_axis_angle = np.arctan2(np.linalg.norm(np.cross(
+                    normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([0, 0, 1])))
+
+                R_alpha = np.array([[np.cos(z_axis_angle), -np.sin(z_axis_angle), 0],
+                                    [np.sin(z_axis_angle), np.cos(
+                                        z_axis_angle), 0],
+                                    [0, 0, 1]])
+
+                R_beta = np.array([[np.cos(y_axis_angle), 0, np.sin(y_axis_angle)],
+                                   [0, 1, 0],
+                                   [-np.sin(y_axis_angle), 0, np.cos(y_axis_angle)]])
+
+                R_gamma = np.array([[1, 0, 0],
+                                    [0, np.cos(x_axis_angle), -
+                                     np.sin(x_axis_angle)],
+                                    [0, np.sin(x_axis_angle), np.cos(x_axis_angle)]])
+                R = np.dot(R_alpha, np.dot(R_beta, R_gamma))
+
+                H = np.matrix(
+                    [[0, -point[2], point[1]], [point[2], 0, -point[0]], [-point[1], point[0], 0]])
+
+                cross_G = np.dot(H, R)
+                zeros_matrix = np.zeros((3, 3))
+                G_i = np.vstack((np.hstack((R, zeros_matrix)),
+                                np.hstack((np.cross(cross_G, R), R))))
+                F_oi = np.dot(G_i, self.Bci)
+                if G is None:
+                    G = F_oi
+                else:
+                    G = np.hstack((G, F_oi))
+            print(f"{G.shape}")
 
 
 def visualize(mesh):
