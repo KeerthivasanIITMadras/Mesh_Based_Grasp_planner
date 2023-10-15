@@ -2,6 +2,7 @@ import open3d as o3d
 import numpy as np
 import pandas as pd
 from itertools import combinations
+from scipy.optimize import minimize
 
 
 class KdTree:
@@ -34,8 +35,6 @@ class KdTree:
                 np.array([np.asarray(self.pcd.normals[i]) for i in idx]))
             force_optimization = Optimization(new_pcd)
             force_optimization.transformation()
-            break
-            # visualize(new_pcd)
 
 
 class Optimization:
@@ -46,6 +45,14 @@ class Optimization:
         # For point contact with friction
         self.Bci = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1], [
             0, 0, 0], [0, 0, 0], [0, 0, 0]])
+        self.G = None
+        self.mew = 1  # assuming it is high friction surface for testing
+
+        # fc for a 3 fingered gripper will be 9x1 vector
+        # first 3 elements contains one contact point information
+        # Next 3 contains next finger information
+        # Next 3 contains next finger information
+        self.fc = [0, 0, 2, 0, 0, 2, 0, 0, 2]
 
     def choose(self):
         unique_combinations = np.asarray(
@@ -55,10 +62,10 @@ class Optimization:
     def transformation(self):
         unique_combinations = self.choose()
         for i, combination in enumerate(unique_combinations, start=1):
-            print("New combination")
-            G = None
+            self.G = None
             for point, normal in combination:
                 # This gives us orientation of normal vector with x,y and z axis
+                normal = -normal
                 x_axis_angle = np.arctan2(np.linalg.norm(np.cross(
                     normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([1, 0, 0])))
                 y_axis_angle = np.arctan2(np.linalg.norm(np.cross(
@@ -89,11 +96,53 @@ class Optimization:
                 G_i = np.vstack((np.hstack((R, zeros_matrix)),
                                 np.hstack((np.cross(cross_G, R), R))))
                 F_oi = np.dot(G_i, self.Bci)
-                if G is None:
-                    G = F_oi
+                if self.G is None:
+                    self.G = F_oi
                 else:
-                    G = np.hstack((G, F_oi))
-            print(f"{G.shape}")
+                    self.G = np.hstack((self.G, F_oi))
+            # I have to optimize the points from here
+            self.solve(combination)
+
+    def objective_function(self, fc):
+        return np.linalg.norm(np.dot(self.G, fc)+self.f_ext)
+
+    # first putting all greater than constraint
+
+    # def constraint_1(self, fc):
+    #     return fc[2]
+
+    # def constraint_2(self, fc):
+    #     return fc[5]
+
+    # def constraint_3(self, fc):
+    #     return fc[8]
+
+    # friction cone constraints
+    def constraint_4(self, fc):
+        return self.mew*fc[2]-np.sqrt(fc[0]**2+fc[1]**2)
+
+    def constraint_5(self, fc):
+        return self.mew*fc[5]-np.sqrt(fc[3]**2+fc[4]**2)
+
+    def constraint_6(self, fc):
+        return self.mew*fc[8]-np.sqrt(fc[6]**2+fc[7]**2)
+
+    def solve(self, combination):
+        con4 = {'type': 'ineq', 'fun': self.constraint_4}
+        con5 = {'type': 'ineq', 'fun': self.constraint_5}
+        con6 = {'type': 'ineq', 'fun': self.constraint_6}
+        b = (0, 8)
+        bnds = [b, b, b, b, b, b, b, b, b]
+        cons = [con4, con5, con6]
+        sol = minimize(self.objective_function, self.fc,
+                       method='SLSQP', bounds=bnds, constraints=cons)
+        if self.objective_function(sol.x) < 8:
+            print("New combination")
+            print(combination)
+            print(
+                f"Normal forces to be applied at the contacts {sol.x[2]} {sol.x[5]} {sol.x[8]} and corresponding error = {self.objective_function(sol.x)}")
+            print(
+                f"Friction forces in these points are {sol.x[0]} {sol.x[1]} {sol.x[3]} {sol.x[4]} {sol.x[6]} {sol.x[7]}")
 
 
 def visualize(mesh):
