@@ -20,6 +20,9 @@ class KdTree:
         return idx
 
     def search(self):
+        min = 12
+        reqd_combination = None
+        solution = None
         while len(self.checked_points) <= len(self.pcd.points):
             sample_point = np.random.randint(0, len(self.pcd.points))
             if sample_point in self.checked_points:
@@ -35,13 +38,26 @@ class KdTree:
                 np.array([np.asarray(self.pcd.normals[i]) for i in idx]))
             force_optimization = Optimization(new_pcd)
             force_optimization.transformation()
+            min_error_combination = force_optimization.solved_combination
+            min_error = force_optimization.min
+            if min > min_error:
+                reqd_combination = min_error_combination
+                min = min_error
+                solution = force_optimization.solution
+        # So reqd_combination will have the required points and normals
+        print(f"Error={min}")
+        print(
+            f"Normal forces to be applied at the contacts {solution[2]} {solution[5]} {solution[8]}")
+        print(
+            f"Friction forces in these points are {solution[0]} {solution[1]} {solution[3]} {solution[4]} {solution[6]} {solution[7]}")
+        return reqd_combination
 
 
 class Optimization:
     def __init__(self, pcd):
         self.pcd = pcd
         self.max_force = 10
-        self.f_ext = np.asarray([0, 0, -10, 0, 0, 0])
+        self.f_ext = np.asarray([0, 0, 10, 0, 0, 0])
         # For point contact with friction
         self.Bci = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1], [
             0, 0, 0], [0, 0, 0], [0, 0, 0]])
@@ -53,6 +69,9 @@ class Optimization:
         # Next 3 contains next finger information
         # Next 3 contains next finger information
         self.fc = [0, 0, 2, 0, 0, 2, 0, 0, 2]
+        self.min = 15  # Taking 15 since max error will be 10
+        self.solved_combination = None
+        self.solution = None
 
     def choose(self):
         unique_combinations = np.asarray(
@@ -69,9 +88,9 @@ class Optimization:
                 x_axis_angle = np.arctan2(np.linalg.norm(np.cross(
                     normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([1, 0, 0])))
                 y_axis_angle = np.arctan2(np.linalg.norm(np.cross(
-                    normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([0, 1, 0])))
+                    normal, np.asarray([0, 1, 0]))), np.dot(normal, np.asarray([0, 1, 0])))
                 z_axis_angle = np.arctan2(np.linalg.norm(np.cross(
-                    normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([0, 0, 1])))
+                    normal, np.asarray([0, 0, 1]))), np.dot(normal, np.asarray([0, 0, 1])))
 
                 R_alpha = np.array([[np.cos(z_axis_angle), -np.sin(z_axis_angle), 0],
                                     [np.sin(z_axis_angle), np.cos(
@@ -131,7 +150,7 @@ class Optimization:
         con4 = {'type': 'ineq', 'fun': self.constraint_4}
         con5 = {'type': 'ineq', 'fun': self.constraint_5}
         con6 = {'type': 'ineq', 'fun': self.constraint_6}
-        b = (0, 8)
+        b = (0, 10)
         bnds = [b, b, b, b, b, b, b, b, b]
         cons = [con4, con5, con6]
         sol = minimize(self.objective_function, self.fc,
@@ -143,6 +162,10 @@ class Optimization:
                 f"Normal forces to be applied at the contacts {sol.x[2]} {sol.x[5]} {sol.x[8]} and corresponding error = {self.objective_function(sol.x)}")
             print(
                 f"Friction forces in these points are {sol.x[0]} {sol.x[1]} {sol.x[3]} {sol.x[4]} {sol.x[6]} {sol.x[7]}")
+        if self.objective_function(sol.x) < self.min:
+            self.min = self.objective_function(sol.x)
+            self.solved_combination = combination
+            self.solution = sol.x
 
 
 def visualize(mesh):
@@ -169,6 +192,27 @@ def mesh2PointCloud(mesh):
     return pcd
 
 
+def force_visualizer(mesh, points, normals):
+    visualizer = o3d.visualization.Visualizer()
+    visualizer.create_window()
+    visualizer.add_geometry(mesh)  # Display the STL mesh
+    # points = np.asarray(mesh.points)
+    # x_centroid = np.mean(points[:, 0])
+    # y_centroid = np.mean(points[:, 1])
+    # z_centroid = np.mean(points[:, 2])
+    # mesh_coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
+    #     size=5, origin=[x_centroid, y_centroid, z_centroid])
+    # Display points
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.normals = o3d.utility.Vector3dVector(normals)
+
+    visualizer.add_geometry(pcd)
+
+    visualizer.run()
+    visualizer.destroy_window()
+
+
 def main():
     mesh_path = "cuboid.stl"
     mesh = o3d.io.read_triangle_mesh(mesh_path)
@@ -180,8 +224,17 @@ def main():
     # pcd_df.to_excel('object.xlsx', sheet_name='Sheet_name_1')
     # To visualize normal,press n
     obj = KdTree(pcd)
-    obj.search()
+    reqd_combination = obj.search()
     # visualize(pcd)
+    points = []
+    normals = []
+    for point, normal in reqd_combination:
+        points.append(point)
+        normals.append(normal)
+
+    force_visualizer(mesh, np.asarray(points), np.asarray(normals))
+    print("Final solution is")
+    print(reqd_combination)
 
 
 if __name__ == "__main__":
