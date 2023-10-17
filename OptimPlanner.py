@@ -9,7 +9,6 @@ from scipy.optimize import minimize
 
 class logger():
     def __init__(self):
-      
         self.candidate1 = []
         self.candidate2 = []
         self.candidate3 = []
@@ -52,7 +51,6 @@ class KdTree:
         self.checked_points = []   
 
     def get_points(self, center_point):
-
         [k, idx, _] = self.kd_tree.search_radius_vector_3d(
             center_point, self.radius_sweep)
         return idx
@@ -67,13 +65,6 @@ class KdTree:
         force_optimization = Optimization(handle_id,idx,self.pcd)
         force_optimization.transformation()
         # So reqd_combination will have the required points and normals
-
-        '''print(f"Error={min}")
-        print(
-            f"Normal forces to be applied at the contacts {solution[2]} {solution[5]} {solution[8]}")
-        print(
-            f"Friction forces in these points are {solution[0]} {solution[1]} {solution[3]} {solution[4]} {solution[6]} {solution[7]}")
-        return reqd_combination'''
 
 
 class Optimization:
@@ -95,13 +86,11 @@ class Optimization:
         self.solution = None
 
     def choose(self):
-
         unique_combinations = np.asarray(
             list(combinations(self.idx, 2)))
         return unique_combinations
 
     def transformation(self):
-        
         unique_combinations = list(self.choose())
         new_combinations = [[item[0], item[1], self.handle_id] for item in unique_combinations]
          
@@ -151,12 +140,9 @@ class Optimization:
                 if self.G is None:
                     self.G = F_oi
                 else:
-                    self.G = np.hstack((self.G, F_oi))
-                
+                    self.G = np.hstack((self.G, F_oi))              
             self.solve()
-                    
-            # I have to optimize the points from here
-            
+          
 
     def objective_function(self, fc):
         return np.linalg.norm(np.dot(self.G, fc)+self.f_ext)
@@ -180,15 +166,6 @@ class Optimization:
         sol = minimize(self.objective_function, self.fc,
                        method='SLSQP', bounds=bnds, constraints=cons)
         err = self.objective_function(sol.x)
-        
-        
-
-        #if self.objective_function(sol.x) < 8:
-            #print(
-             #   f"Normal forces to be applied at the contacts {sol.x[2]} {sol.x[5]} {sol.x[8]} and corresponding error = {self.objective_function(sol.x)}")
-            #print(
-             #   f"Friction forces in these points are {sol.x[0]} {sol.x[1]} {sol.x[3]} {sol.x[4]} {sol.x[6]} {sol.x[7]}")
-            
         solution = list(sol.x)
         print(np.shape(solution))
         log1.log(solution,self.idt,err)
@@ -206,12 +183,10 @@ def visualize(mesh):
     o3d.visualization.draw_geometries(
         [mesh_coord_frame, mesh], point_show_normal=True)
 
-
 def mesh2PointCloud(mesh):
     n_pts = 100
     pcd = mesh.sample_points_uniformly(n_pts)
     return pcd
-
 
 def force_visualizer(mesh, points, normals):
     visualizer = o3d.visualization.Visualizer()
@@ -225,7 +200,6 @@ def force_visualizer(mesh, points, normals):
     visualizer.run()
     visualizer.destroy_window()
 
-
 def main():
     #log = logger()
     mesh_path = "cuboid.stl"
@@ -235,12 +209,9 @@ def main():
     pcd_df = pd.DataFrame(np.concatenate((np.asarray(pcd.points), np.asarray(pcd.normals)), axis=1),
                           columns=["x", "y", "z", "norm-x", "norm-y", "norm-z"]
                           )
-
     obj = KdTree(pcd)
     reqd_combination = obj.search()
-  
-    
-    #force_visualizer(mesh, np.asarray(points), np.asarray(normals))
+
     log1.save_file()
 
 
