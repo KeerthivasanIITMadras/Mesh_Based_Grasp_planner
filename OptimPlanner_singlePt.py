@@ -6,8 +6,10 @@ from itertools import combinations
 from scipy.optimize import minimize
 
 
+
 class logger():
     def __init__(self):
+      
         self.candidate1 = []
         self.candidate2 = []
         self.candidate3 = []
@@ -26,7 +28,6 @@ class logger():
         self.err.append(err)  
 
     def save_file(self):
-       print(np.shape(self.candidate1))
        df = pd.DataFrame({"Pt1" : self.candidate1, "Pt2" : self.candidate2,"Pt3" : self.candidate3, "F1" : self.handle_force, "F2": self.sec_force, "F3": self.ter_force, "Error" :self.err})
        df.to_csv("realtime_diagnostics.csv", index = False)
 
@@ -38,7 +39,7 @@ class logger():
         plt.xlabel('Candidate Number')
         plt.ylabel('Final cost')
         plt.title('cost analysis')
-
+        plt.show()
 class KdTree:
     def __init__(self, pcd):
         self.pcd = pcd
@@ -48,6 +49,7 @@ class KdTree:
         self.checked_points = []   
 
     def get_points(self, center_point):
+
         [k, idx, _] = self.kd_tree.search_radius_vector_3d(
             center_point, self.radius_sweep)
         return idx
@@ -83,21 +85,22 @@ class Optimization:
         self.solution = None
 
     def choose(self):
+
         unique_combinations = np.asarray(
             list(combinations(self.idx, 2)))
         return unique_combinations
 
     def transformation(self):
+        
         unique_combinations = list(self.choose())
         new_combinations = [[item[0], item[1], self.handle_id] for item in unique_combinations]
          
         for i in range(len(new_combinations)):
-            print("new")
+            
             self.G = None
             self.idt = []
             for j in range(3):
                 id = new_combinations[i][j]
-                print(id)
                 self.idt.append(id)
                  
                 normal = self.pcd.normals[id]
@@ -137,9 +140,9 @@ class Optimization:
                 if self.G is None:
                     self.G = F_oi
                 else:
-                    self.G = np.hstack((self.G, F_oi))              
+                    self.G = np.hstack((self.G, F_oi))               
             self.solve()
-          
+
 
     def objective_function(self, fc):
         return np.linalg.norm(np.dot(self.G, fc)+self.f_ext)
@@ -164,11 +167,8 @@ class Optimization:
                        method='SLSQP', bounds=bnds, constraints=cons)
         err = self.objective_function(sol.x)
         solution = list(sol.x)
-        print(np.shape(solution))
         log1.log(solution,self.idt,err)
         
-
-
 def visualize(mesh):
 
     points = np.asarray(mesh.points)
@@ -180,10 +180,12 @@ def visualize(mesh):
     o3d.visualization.draw_geometries(
         [mesh_coord_frame, mesh], point_show_normal=True)
 
+
 def mesh2PointCloud(mesh):
     n_pts = 100
     pcd = mesh.sample_points_uniformly(n_pts)
     return pcd
+
 
 def force_visualizer(mesh, points, normals):
     visualizer = o3d.visualization.Visualizer()
@@ -197,8 +199,9 @@ def force_visualizer(mesh, points, normals):
     visualizer.run()
     visualizer.destroy_window()
 
+
 def main():
-    #log = logger()
+
     mesh_path = "cuboid.stl"
     mesh = o3d.io.read_triangle_mesh(mesh_path)
     mesh.compute_vertex_normals()
@@ -206,10 +209,11 @@ def main():
     pcd_df = pd.DataFrame(np.concatenate((np.asarray(pcd.points), np.asarray(pcd.normals)), axis=1),
                           columns=["x", "y", "z", "norm-x", "norm-y", "norm-z"]
                           )
+
     obj = KdTree(pcd)
     reqd_combination = obj.search()
-
     log1.save_file()
+    log1.cost_visualizer()
 
 log1 = logger()
 
