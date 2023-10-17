@@ -6,7 +6,6 @@ from itertools import combinations
 from scipy.optimize import minimize
 
 
-
 class logger():
     def __init__(self):
         self.candidate1 = []
@@ -40,8 +39,6 @@ class logger():
         plt.ylabel('Final cost')
         plt.title('cost analysis')
 
-
-log1 = logger()
 class KdTree:
     def __init__(self, pcd):
         self.pcd = pcd
@@ -214,6 +211,7 @@ def main():
 
     log1.save_file()
 
+log1 = logger()
 
 if __name__ == "__main__":
     main()
