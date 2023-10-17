@@ -17,19 +17,27 @@ class logger():
         self.handle_force = []
         self.sec_force = []
         self.ter_force = []
+        self.temp = 1
     
+    
+
     def log(self,sol,id,err):
+        if err < self.temp:
+            self.temp = err
+            self.min = id
         self.candidate1.append(id[0])
         self.candidate2.append(id[1])
         self.candidate3.append(id[2])
         self.handle_force.append([sol[2]])
         self.sec_force.append([sol[5]]) 
         self.ter_force.append([sol[8]])
-        self.err.append(err)  
+        self.err.append(err)
+          
 
     def save_file(self):
        df = pd.DataFrame({"Pt1" : self.candidate1, "Pt2" : self.candidate2,"Pt3" : self.candidate3, "F1" : self.handle_force, "F2": self.sec_force, "F3": self.ter_force, "Error" :self.err})
        df.to_csv("realtime_diagnostics.csv", index = False)
+       return(self.min)
        
 
     def cost_visualizer(self):
@@ -56,8 +64,9 @@ class KdTree:
         return idx
 
     def search(self):
+     for k in range(len(self.pcd.points)):
         min = 12
-        handle_id = 89
+        handle_id = k
         query_point = self.pcd.points[handle_id]
         idx = self.get_points(query_point)
         idx = list(idx)
@@ -92,10 +101,9 @@ class Optimization:
         return unique_combinations
 
     def transformation(self):
-     for k in range(len(self.pcd.points)):
-     
+
         unique_combinations = list(self.choose())
-        new_combinations = [[item[0], item[1], k] for item in unique_combinations]
+        new_combinations = [[item[0], item[1], self.handle_id] for item in unique_combinations]
          
         for i in range(len(new_combinations)):
             
@@ -169,7 +177,7 @@ class Optimization:
                        method='SLSQP', bounds=bnds, constraints=cons)
         err = self.objective_function(sol.x)
         solution = list(sol.x)
-        if self.objective_function(sol.x) < 1.5:
+        if self.objective_function(sol.x) < 0.2:
          log1.log(solution,self.idt,err)
         
 def visualize(mesh):
@@ -190,15 +198,38 @@ def mesh2PointCloud(mesh):
     return pcd
 
 
-def force_visualizer(mesh, points, normals):
+def force_visualizer(mesh, points, normals,center_point):
     visualizer = o3d.visualization.Visualizer()
     visualizer.create_window()
-    visualizer.add_geometry(mesh)  # Display the STL mesh
+    visualizer.add_geometry(mesh)
 
+    points1 = np.array([[center_point[0],center_point[1],-75], [center_point[0],center_point[1],75]])
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(points1)
+ 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     pcd.normals = o3d.utility.Vector3dVector(normals)
     visualizer.add_geometry(pcd)
+
+    scene = o3d.geometry.PointCloud()
+    points2 = np.array([[100, 200, 300], [400, 500, 600], [700, 800, 900]])
+    scene.points = o3d.utility.Vector3dVector(points2)
+    axes_line_set = o3d.geometry.LineSet()
+    axes_line_set.points = o3d.utility.Vector3dVector([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    axes_line_set.lines = o3d.utility.Vector2iVector([[0, 1], [0, 2], [0, 3]])
+    colors1 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    axes_line_set.colors = o3d.utility.Vector3dVector(colors1)
+    visualizer.add_geometry(axes_line_set)
+
+    lines = [[0, 1]]
+    colors = [[1, 0, 0]]  # Red color
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(points1)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+    
+    visualizer.add_geometry(line_set)
     visualizer.run()
     visualizer.destroy_window()
 
@@ -209,14 +240,18 @@ def main():
     mesh = o3d.io.read_triangle_mesh(mesh_path)
     mesh.compute_vertex_normals()
     pcd = mesh2PointCloud(mesh)
+    center_point = np.mean(np.asarray(pcd.points), axis=0)
     pcd_df = pd.DataFrame(np.concatenate((np.asarray(pcd.points), np.asarray(pcd.normals)), axis=1),
                           columns=["x", "y", "z", "norm-x", "norm-y", "norm-z"]
                           )
 
     obj = KdTree(pcd)
     reqd_combination = obj.search()
-    log1.save_file()
+    min = log1.save_file()
     log1.cost_visualizer()
+    ns = np.asarray([pcd.normals[min[0]],pcd.normals[min[1]],pcd.normals[min[2]]])
+    pts = np.asarray([pcd.points[min[0]],pcd.points[min[1]],pcd.points[min[2]]])
+    force_visualizer(mesh,pts,ns,center_point)
 
 log1 = logger()
 
