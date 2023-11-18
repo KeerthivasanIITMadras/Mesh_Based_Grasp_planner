@@ -292,7 +292,7 @@ def visualizer(mesh):
 
 def main():
     start = time.time()
-    mesh_path = "CubeSquare.stl"
+    mesh_path = "Hexagon.stl"
     mesh = o3d.io.read_triangle_mesh(mesh_path)
     mesh.compute_vertex_normals()
     pcd = mesh2PointCloud(mesh)
