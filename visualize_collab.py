@@ -8,7 +8,7 @@ import time
 
 import csv
 
-file_path = 'possible_grasps(1).csv'
+file_path = 'results/cone.csv'
 
 with open(file_path, 'r') as file:
     csv_reader = csv.reader(file)
@@ -72,7 +72,7 @@ def mesh2PointCloud(mesh):
     pcd = mesh.sample_points_uniformly(n_pts)
     return pcd
 
-mesh_path = "CubeSquare.stl"
+mesh_path = "Cone.stl"
 mesh = o3d.io.read_triangle_mesh(mesh_path)
 mesh.compute_vertex_normals()
 pcd = mesh2PointCloud(mesh)
