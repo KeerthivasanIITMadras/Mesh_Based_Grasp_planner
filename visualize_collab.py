@@ -8,7 +8,7 @@ import time
 
 import csv
 
-file_path = 'results/cone.csv'
+file_path = 'results/Hexagon.csv'
 
 with open(file_path, 'r') as file:
     csv_reader = csv.reader(file)
@@ -69,10 +69,10 @@ def force_visualizer(mesh, points, normals,center_point):
 
 def mesh2PointCloud(mesh):
     n_pts = 50
-    pcd = mesh.sample_points_uniformly(n_pts)
+    pcd = mesh.sample_points_uniformly(n_pts,seed=32)
     return pcd
 
-mesh_path = "Cone.stl"
+mesh_path = "Hexagon.stl"
 mesh = o3d.io.read_triangle_mesh(mesh_path)
 mesh.compute_vertex_normals()
 pcd = mesh2PointCloud(mesh)
