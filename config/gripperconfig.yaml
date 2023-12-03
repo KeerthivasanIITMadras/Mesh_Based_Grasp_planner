@@ -1,0 +1,9 @@
+---
+Robotiq_gripper:
+    base_mode:
+        max_sep_oppfingers: 18.513
+        min_sep_oppfingers: 3
+        dist_parallelfingers: 7.303
+        locus: 'straightline'
+        tipcenter_height_center_palm: 9.066
+        dist_mirror_parallelfingers: 3.651
