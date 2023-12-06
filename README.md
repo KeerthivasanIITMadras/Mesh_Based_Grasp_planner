@@ -1,6 +1,6 @@
 # Mesh_Based_Grasp_planner
-Python interface for a novel mesh based grasp planner algorithm
-Open the CSV file for Diagnostics and post processing
+Python interface for a novel mesh based grasp planner algorithm.
+This algorithm is specifically built for the Robotiq adaptive 3 fingered gripper for force closure application
 
 # RESULTS
 The points here are shown for various primitive objects and the force orientation and magnitude required at those points
