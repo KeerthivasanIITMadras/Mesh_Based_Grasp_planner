@@ -16,5 +16,7 @@ The points here are shown for various primitive objects and the force orientatio
 ![Screenshot from 2023-12-07 01-18-51](https://github.com/KeerthivasanIITMadras/Mesh_Based_Grasp_planner/assets/94305617/85eb27e5-ef41-4e3e-80e6-23f0543d6209)
 ![Screenshot from 2023-12-07 01-18-53](https://github.com/KeerthivasanIITMadras/Mesh_Based_Grasp_planner/assets/94305617/1876eb6a-1bb7-430f-b707-d6a144211da5)
 ![Screenshot from 2023-12-07 01-18-55](https://github.com/KeerthivasanIITMadras/Mesh_Based_Grasp_planner/assets/94305617/ba93eaa3-29d8-4267-b7d2-d5b5259a07e6)
+![Screenshot from 2023-12-07 01-20-54](https://github.com/KeerthivasanIITMadras/Mesh_Based_Grasp_planner/assets/94305617/c751da2e-84f5-4b18-b86c-c676eb0dc670)
 ![Screensho![Screenshot from 2023-12-07 01-20-57](https://github.com/KeerthivasanIITMadras/Mesh_Based_Grasp_planner/assets/94305617/b39c643e-4f45-4e76-8f49-02aa5de6bac6)
 t from 2023-12-07 01-20-54](https://github.com/KeerthivasanIITMadras/Mesh_Based_Grasp_planner/assets/94305617/3b387525-0212-496d-84b0-e60b0171971c)
+
