@@ -8,7 +8,7 @@ import time
 
 import csv
 
-file_path = 'results/Hexagon.csv'
+file_path = '/home/keerthivasan/keerthi/nkp/results/CubeSquare.csv'
 
 with open(file_path, 'r') as file:
     csv_reader = csv.reader(file)
@@ -35,7 +35,7 @@ def force_visualizer(mesh, points, normals,center_point):
     visualizer = o3d.visualization.Visualizer()
     visualizer.create_window()
     visualizer.add_geometry(mesh)
-
+    print(normals)
     points1 = np.array([[center_point[0],center_point[1],-75], [center_point[0],center_point[1],75]])
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points1)
@@ -68,11 +68,11 @@ def force_visualizer(mesh, points, normals,center_point):
 
 
 def mesh2PointCloud(mesh):
-    n_pts = 50
+    n_pts = 200
     pcd = mesh.sample_points_uniformly(n_pts,seed=32)
     return pcd
 
-mesh_path = "Hexagon.stl"
+mesh_path = "/home/keerthivasan/keerthi/nkp/cad_files/CubeSquare.stl"
 mesh = o3d.io.read_triangle_mesh(mesh_path)
 mesh.compute_vertex_normals()
 pcd = mesh2PointCloud(mesh)

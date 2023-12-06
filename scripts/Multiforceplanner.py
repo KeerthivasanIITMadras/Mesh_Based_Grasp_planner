@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from itertools import combinations
 from scipy.optimize import minimize
 import time
-
+import Isochoose
 
 
 class logger():
@@ -18,7 +18,7 @@ class logger():
         self.handle_force = []
         self.sec_force = []
         self.ter_force = []
-        self.temp = 10
+        self.temp = 70
         self.min = []
     
     
@@ -26,7 +26,6 @@ class logger():
     def log(self,sol,id,err,pcd):
 
         ns = np.asarray([pcd.normals[id[0]],pcd.normals[id[1]],pcd.normals[id[2]]])
-        rank = np.linalg.matrix_rank(ns) 
 
         if err < self.temp:
             self.temp = err
@@ -55,194 +54,130 @@ class logger():
         plt.ylabel('Final cost')
         plt.title('cost analysis')
         plt.show()
-class KdTree:
+    
+
+class Optimization():
+
     def __init__(self, pcd):
+        self.isochoose = Isochoose.Isotrichoose()
         self.pcd = pcd
-        self.kd_tree = o3d.geometry.KDTreeFlann(self.pcd)
-        self.radius_sweep = 80
-        self.selected_points = []
-        self.checked_points = []   
-
-    def get_points(self, center_point):
-
-        [k, idx, _] = self.kd_tree.search_radius_vector_3d(
-            center_point, self.radius_sweep)
-        return idx
-
-    def search(self):
-     for k in range(len(self.pcd.points)):
-        min = 12
-        handle_id = k
-        query_point = self.pcd.points[handle_id]
-        idx = self.get_points(query_point)
-        idx = list(idx)
-        idx.remove(handle_id)
-        force_optimization = Optimization(handle_id,idx,self.pcd)
-        force_optimization.transformation()
-        # So reqd_combination will have the required points and normals
-
-
-class Optimization:
-
-    def __init__(self,handle_id, idx, pcd):
-        self.handle_id = handle_id
-        self.idx = idx
-        self.pcd = pcd
-        self.max_force = 10
-        self.f_ext_1 = np.asarray([0, 0, 10, 0, 0, 0])
-        self.f_ext_2 = np.asarray([0, 10, 0, 0, 0, 0])
-        self.f_ext_3 = np.asarray([10, 0, 0, 0, 0, 0])
-        self.f_ext_4 = np.asarray([0, -10, 0, 0, 0, 0])
-        self.f_ext_5 = np.asarray([-10, 0, 0, 0, 0, 0])
+        self.max_force = 70
+        self.f_ext_1 = np.array([0, 0, 20, 0, 0, 0])
         # For point contact with friction
         self.Bci = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1], [
             0, 0, 0], [0, 0, 0], [0, 0, 0]])
         self.G = None
         self.mew = 0.7  
-        self.fc = [0, 0, 2, 0, 0, 2, 0, 0, 2]
-        self.min = 15  # Taking 15 since max error will be 10
+        self.fc = np.array([0, 0, 70, 0, 0, 70, 0, 0, 70])
+        self.min = 70  # Taking 15 since max error will be 10
         self.solved_combination = None
         self.solution = None
-        self.length = self.boundingbox_len()
+        self.idt = 0
+        self.valid_points = 0
+
    
-    def choose(self):
+    def select(self):
+        points = np.array(self.pcd.points)
+        normals_all = np.array(self.pcd.normals)
+        point_indices = list(range(len(points)))
+        point_combinations = combinations(point_indices, 3)
 
-        unique_combinations = np.asarray(
-            list(combinations(self.idx, 2)))
-        return unique_combinations
-
-    def transformation(self):
-
-        unique_combinations = list(self.choose())
-        new_combinations = [[item[0], item[1], self.handle_id] for item in unique_combinations]
-         
-        for i in range(len(new_combinations)):
+        for comb in point_combinations:
+            indices = list(comb)
+            self.idt = indices
+            triplets = np.array(points)[indices]
+            normals = normals_all[indices]
+            if self.isochoose.choose(triplets,normals):
+                self.transformation(triplets,normals)
+                self.valid_points+=1
+                
+            else:
+                continue
+        print(self.valid_points)
             
-            self.G = None
-            self.idt = []
-            for j in range(3):
-                id = new_combinations[i][j]
-                self.idt.append(id)
-                 
-                normal = self.pcd.normals[id]
-                point = self.pcd.points[id]
-                # This gives us orientation of normal vector with x,y and z axis
-                normal = -normal
-                x_axis_angle = np.arctan2(np.linalg.norm(np.cross(
-                    normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([1, 0, 0])))
-                y_axis_angle = np.arctan2(np.linalg.norm(np.cross(
-                    normal, np.asarray([0, 1, 0]))), np.dot(normal, np.asarray([0, 1, 0])))
-                z_axis_angle = np.arctan2(np.linalg.norm(np.cross(
-                    normal, np.asarray([0, 0, 1]))), np.dot(normal, np.asarray([0, 0, 1])))
-
-                R_alpha = np.array([[np.cos(z_axis_angle), -np.sin(z_axis_angle), 0],
-                                    [np.sin(z_axis_angle), np.cos(
-                                        z_axis_angle), 0],
-                                    [0, 0, 1]])
-
-                R_beta = np.array([[np.cos(y_axis_angle), 0, np.sin(y_axis_angle)],
-                                   [0, 1, 0],
-                                   [-np.sin(y_axis_angle), 0, np.cos(y_axis_angle)]])
-
-                R_gamma = np.array([[1, 0, 0],
-                                    [0, np.cos(x_axis_angle), -
-                                     np.sin(x_axis_angle)],
-                                    [0, np.sin(x_axis_angle), np.cos(x_axis_angle)]])
-                R = np.dot(R_alpha, np.dot(R_beta, R_gamma))
-
-                H = np.matrix(
-                    [[0, -point[2], point[1]], [point[2], 0, -point[0]], [-point[1], point[0], 0]])
-
-                cross_G = np.dot(H, R)
-                zeros_matrix = np.zeros((3, 3))
-                G_i = np.vstack((np.hstack((R, zeros_matrix)),
-                                np.hstack((np.cross(cross_G, R), R))))
-                F_oi = np.dot(G_i, self.Bci)
-                if self.G is None:
-                    self.G = F_oi
-                else:
-                    self.G = np.hstack((self.G, F_oi))               
-            self.solve()
+    def transformation(self,triplets,normals):
+        self.G = None
+        for i in range(len(triplets)):
+            normal = normals[i]
+            point = triplets[i]
+            # This gives us orientation of normal vector with x,y and z axis
+            normal = -normal
+            x_axis_angle = np.arctan2(np.linalg.norm(np.cross(
+                normal, np.asarray([1, 0, 0]))), np.dot(normal, np.asarray([1, 0, 0])))
+            y_axis_angle = np.arctan2(np.linalg.norm(np.cross(
+                normal, np.asarray([0, 1, 0]))), np.dot(normal, np.asarray([0, 1, 0])))
+            z_axis_angle = np.arctan2(np.linalg.norm(np.cross(
+                normal, np.asarray([0, 0, 1]))), np.dot(normal, np.asarray([0, 0, 1])))
+            R_alpha = np.array([[np.cos(z_axis_angle), -np.sin(z_axis_angle), 0],
+                                [np.sin(z_axis_angle), np.cos(
+                                    z_axis_angle), 0],
+                                [0, 0, 1]])
+            R_beta = np.array([[np.cos(y_axis_angle), 0, np.sin(y_axis_angle)],
+                               [0, 1, 0],
+                               [-np.sin(y_axis_angle), 0, np.cos(y_axis_angle)]])
+            R_gamma = np.array([[1, 0, 0],
+                                [0, np.cos(x_axis_angle), -
+                                 np.sin(x_axis_angle)],
+                                [0, np.sin(x_axis_angle), np.cos(x_axis_angle)]])
+            R = np.dot(R_alpha, np.dot(R_beta, R_gamma))
+            H = np.matrix(
+                [[0, -point[2], point[1]], [point[2], 0, -point[0]], [-point[1], point[0], 0]])
+            cross_G = np.dot(H, R)
+            zeros_matrix = np.zeros((3, 3))
+            G_i = np.vstack((np.hstack((R, zeros_matrix)),
+                            np.hstack((np.cross(cross_G, R), R))))
+            F_oi = np.dot(G_i, self.Bci)
+            if self.G is None:
+                self.G = F_oi
+            else:
+                self.G = np.hstack((self.G, F_oi))     
+        self.solve()
 
 
 
     def objective_function(self, fc):
-        return np.linalg.norm(np.dot(self.G, fc)+self.f_ext_1)*np.linalg.norm(np.dot(self.G, fc)+self.f_ext_2)*np.linalg.norm(np.dot(self.G, fc)+self.f_ext_3)
-
-    def constraint_4(self, fc):
+        return np.linalg.norm(np.dot(self.G, fc)+self.f_ext_1)
+    
+    def constraint_1(self, fc):
         return self.mew*fc[2]-np.sqrt(fc[0]**2+fc[1]**2)
 
-    def constraint_5(self, fc):
+    def constraint_2(self, fc):
         return self.mew*fc[5]-np.sqrt(fc[3]**2+fc[4]**2)
 
-    def constraint_6(self, fc):
+    def constraint_3(self, fc):
         return self.mew*fc[8]-np.sqrt(fc[6]**2+fc[7]**2)
-    
-    #def constraint_7(self, fc):
-        #return fc[2]-4
-    
-    #def constraint_8(self, fc):
-        #return fc[5]- 4
-    
-    #def constraint_9(self, fc):
-        #return fc[8]- 4
-    def centroid_sep(self):
-        c=np.array([])
-        center_point = np.mean(np.asarray(self.pcd.points),axis=0)
-        point1 = self.pcd.points[self.idt[0]]
-        point2 = self.pcd.points[self.idt[0]]
-        point3 = self.pcd.points[self.idt[0]]
-        centroid = (point1 + point2 + point3) / 3.0
-        distance  = np.linalg.norm(centroid - center_point)
-        return distance
-    
-    def boundingbox_len(self):
-        min_bound = np.min(np.asarray(self.pcd.points), axis=0)
-        max_bound = np.max(np.asarray(self.pcd.points), axis=0)
-        length = max_bound[0] - min_bound[0]
-        width = max_bound[1] - min_bound[1]
-        height = max_bound[2] - min_bound[2]
-        k = max([length,width,height])
-        return k
         
+    # def constraint_4(self,fc):
+    #     return fc[2]-fc[5]
+    
+    # def constraint_5(self,fc):
+    #     return fc[5]-fc[8]
 
     def solve(self):
-        con4 = {'type': 'ineq', 'fun': self.constraint_4}
-        con5 = {'type': 'ineq', 'fun': self.constraint_5}
-        con6 = {'type': 'ineq', 'fun': self.constraint_6}
-        #con7 = {'type': 'ineq', 'fun': self.constraint_7}
-        #con8 = {'type': 'ineq', 'fun': self.constraint_8}
-        #con9 = {'type': 'ineq', 'fun': self.constraint_9}
-        b = (0, 20)
+        con1 = {'type': 'ineq', 'fun': self.constraint_1}
+        con2 = {'type': 'ineq', 'fun': self.constraint_2}
+        con3 = {'type': 'ineq', 'fun': self.constraint_3}
+        # con4 = {'type': 'eq', 'fun': self.constraint_4}
+        # con5 = {'type': 'eq', 'fun': self.constraint_5}
+        b = (0, 70)
         bnds = [b, b, b, b, b, b, b, b, b]
-        cons = [con4, con5, con6]
+
+        cons = [con1, con2, con3]
         sol = minimize(self.objective_function, self.fc,
                        method='SLSQP', bounds=bnds, constraints=cons)
         err = self.objective_function(sol.x)
-        if self.objective_function(sol.x) < 0.1:
+        if err < 10:
             print(
                 f"Normal forces to be applied at the contacts {sol.x[2]} {sol.x[5]} {sol.x[8]} and corresponding error = {self.objective_function(sol.x)}")
             print(
                 f"Friction forces in these points are {sol.x[0]} {sol.x[1]} {sol.x[3]} {sol.x[4]} {sol.x[6]} {sol.x[7]}")
-        #distance = self.centroid()
         solution = list(sol.x)
         log1.log(solution,self.idt,err,self.pcd)
 
        
-def visualize(mesh):
-
-    points = np.asarray(mesh.points)
-    x_centroid = np.mean(points[:, 0])
-    y_centroid = np.mean(points[:, 1])
-    z_centroid = np.mean(points[:, 2])
-    mesh_coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-        size=5, origin=[x_centroid, y_centroid, z_centroid])
-    o3d.visualization.draw_geometries(
-        [mesh_coord_frame, mesh], point_show_normal=True)
-
 
 def mesh2PointCloud(mesh):
-    n_pts = 50
+    n_pts = 400 
     pcd = mesh.sample_points_uniformly(n_pts,seed=32)
     return pcd
 
@@ -282,39 +217,28 @@ def force_visualizer(mesh, points, normals,center_point):
     visualizer.run()
     visualizer.destroy_window()
 
-def visualizer(mesh):
-    visualizer = o3d.visualization.Visualizer()
-    visualizer.create_window()
-    visualizer.add_geometry(mesh)
-    visualizer.run()
-    visualizer.destroy_window()
-
 
 def main():
     start = time.time()
-    name = "Hexagon"
+    name = "/home/keerthivasan/keerthi/nkp/cad_files/Sphere"
     mesh_path = f"{name}.stl"
     mesh = o3d.io.read_triangle_mesh(mesh_path)
     mesh.compute_vertex_normals()
     pcd = mesh2PointCloud(mesh)
-    obj = KdTree(pcd)
+    scaling_factor = 0.75
+    pcd.points = o3d.utility.Vector3dVector(np.array(pcd.points)*scaling_factor)
     center_point = np.mean(np.asarray(pcd.points), axis=0)
-    pcd_df = pd.DataFrame(np.concatenate((np.asarray(pcd.points), np.asarray(pcd.normals)), axis=1),
-                          columns=["x", "y", "z", "norm-x", "norm-y", "norm-z"]
-                          )
-
-    
-    reqd_combination = obj.search()
+    optimser = Optimization(pcd)
+    optimser.select()
     min = log1.save_file(name)
     log1.cost_visualizer()
-    print( "Optimum force at fingers is ",pcd.normals[min[0]],pcd.normals[min[1]],pcd.normals[min[2]])
+    # print( "Optimum force at fingers is ",pcd.normals[min[0]],pcd.normals[min[1]],pcd.normals[min[2]])
     ns = np.asarray([pcd.normals[min[0]],pcd.normals[min[1]],pcd.normals[min[2]]])
     
     pts = np.asarray([pcd.points[min[0]],pcd.points[min[1]],pcd.points[min[2]]])
     end = time.time()
     print(f"Total time to run={-start+end}")
-    force_visualizer(mesh,pts,ns,center_point)
-    # visualizer(mesh)
+    force_visualizer(mesh,pts/scaling_factor,ns,center_point/scaling_factor)
 
 log1 = logger()
 
