@@ -2,7 +2,7 @@ import open3d as o3d
 import numpy as np
 import math
 
-class Isotrichoose:
+class Robotiq:
     def __init__(self):
         self.t1 =0
         self.t2 =0
