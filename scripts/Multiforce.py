@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from itertools import combinations
 from scipy.optimize import minimize
 import time
-import Isochoose
+import Gripper
 
 class ros_interface():
     def __init__(self,ctr,eef):
@@ -99,7 +99,7 @@ class logger():
 class Optimization():
 
     def __init__(self, pcd):
-        self.isochoose = Isochoose.Isotrichoose()
+        self.isochoose = Gripper.Robotiq()
         self.pcd = pcd
         self.max_force = 70
         self.f_ext_1 = np.array([0, 0, 20, 0, 0, 0])
