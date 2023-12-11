@@ -3,6 +3,7 @@
 import open3d as o3d
 import rospy
 import tf
+import tf2_ros
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,12 +12,22 @@ from scipy.optimize import minimize
 import time
 import Gripper
 
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()
+
 class ros_interface():
-    def __init__(self,ctr,eef):
+    def __init__(self,ctr,eef,rpy):
         rospy.init_node('MBGP')
         self.rate = rospy.Rate(10)
-        self.center_point = ctr/100
-        self.eef = eef/100
+        self.center_point = ctr/10
+        self.eef = eef/10
+        self.rpy = rpy
 
     def sendworldTF(self):
         br = tf.TransformBroadcaster()
@@ -29,15 +40,29 @@ class ros_interface():
     def EEFtf(self):
         br = tf.TransformBroadcaster()
         br.sendTransform((self.eef[0], self.eef[1], self.eef[2]),
-                     tf.transformations.quaternion_from_euler(0, 0, 0),
+                     tf.transformations.quaternion_from_euler(rpy[0], rpy[1], rpy[2]),
                      rospy.Time.now(),
                      "EEF",
                      "map")
     
-    def TFpub(self):
+    '''def EEf_obj(Self):
+        listener = tf.TransformListener()
         
+        (trans,rot) = listener.lookupTransform( "EEF", "object",rospy.Time(0))
+        
+        br = tf.TransformBroadcaster()
+        br.sendTransform(trans,
+                     rot,
+                     rospy.Time.now(),
+                     "EEF",
+                     "map")'''
+
+
+    def TFpub(self):
+         
          self.sendworldTF()
          self.EEFtf()
+         #self.EEf_obj()
          rospy.loginfo("Publishing Transforms")
          self.rate.sleep()
     
@@ -59,7 +84,7 @@ class logger():
     
     
 
-    def log(self,sol,id,err,pcd,eefs):
+    def log(self,sol,id,err,pcd,eefs,rpy):
 
         ns = np.asarray([pcd.normals[id[0]],pcd.normals[id[1]],pcd.normals[id[2]]])
 
@@ -67,6 +92,7 @@ class logger():
             self.temp = err
             self.min = id
             self.min_eef= eefs
+            self.rpy = rpy
         self.candidate1.append(id[0])
         self.candidate2.append(id[1])
         self.candidate3.append(id[2])
@@ -82,14 +108,16 @@ class logger():
        df = pd.DataFrame({"Pt1" : self.candidate1, "Pt2" : self.candidate2,"Pt3" : self.candidate3, "F1" : self.handle_force, "F2": self.sec_force, "F3": self.ter_force, "Error" :self.err, "EEF":self.eefa})
        df.to_csv(f"{filename}.csv", index = False)
        print(self.min_eef)
-       return [self.min, self.min_eef]
+       return [self.min, self.min_eef, self.rpy]
        
 
     def cost_visualizer(self):
         k = []
+        plt.figure(num='MBGP Solver Results')
+        plt.style.use('seaborn-darkgrid')
         for i in range(len(self.err)):
             k.append(i)
-        plt.plot( k ,self.err,label=' Cost comparison')
+        plt.scatter( k ,self.err,label=' Cost comparison')
         plt.xlabel('Candidate Number')
         plt.ylabel('Final cost')
         plt.title('cost analysis')
@@ -99,6 +127,7 @@ class logger():
 class Optimization():
 
     def __init__(self, pcd):
+        self.iter = 0
         self.isochoose = Gripper.Robotiq()
         self.pcd = pcd
         self.max_force = 70
@@ -127,6 +156,8 @@ class Optimization():
             self.idt = indices
             triplets = np.array(points)[indices]
             normals = normals_all[indices]
+            self.iter = self.iter +1
+            printProgressBar(self.iter, int(4000000/3), prefix = 'Solver progress:', suffix = 'Complete', length = 50)
             if self.isochoose.choose(triplets,normals):
                 self.transformation(triplets,normals)
                 self.valid_points+=1
@@ -213,7 +244,10 @@ class Optimization():
                 f"Friction forces in these points are {sol.x[0]} {sol.x[1]} {sol.x[3]} {sol.x[4]} {sol.x[6]} {sol.x[7]}")
         solution = list(sol.x)
         eef = np.asarray(self.isochoose.EEf())
-        log1.log(solution,self.idt,err,self.pcd,eef)
+        RPY = self.isochoose.orientation()
+        
+        
+        log1.log(solution,self.idt,err,self.pcd,eef,RPY)
 
        
 
@@ -320,7 +354,7 @@ def main():
     center_point = np.mean(np.asarray(pcd.points), axis=0)
     optimser = Optimization(pcd)
     optimser.select()
-    [min, eefy] = log1.save_file(name)
+    [min, eefy, RPY] = log1.save_file(name)
     log1.cost_visualizer()
     # print( "Optimum force at fingers is ",pcd.normals[min[0]],pcd.normals[min[1]],pcd.normals[min[2]])
     ns = np.asarray([pcd.normals[min[0]],pcd.normals[min[1]],pcd.normals[min[2]]])
@@ -329,13 +363,13 @@ def main():
     end = time.time()
     print(f"Total time to run={-start+end}")
     force_visualizer(mesh,pts/scaling_factor,ns,center_point/scaling_factor,eefy/scaling_factor)
-    return [center_point, eefy]
+    return [center_point, eefy, RPY]
 
 log1 = logger()
 
 if __name__ == "__main__":
-    [ctr,eef] = main()
-    MBGP = ros_interface(ctr,eef)
+    [ctr,eef,rpy] = main()
+    MBGP = ros_interface(ctr,eef,rpy)
     while not rospy.is_shutdown():
         MBGP.TFpub()
     
