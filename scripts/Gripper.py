@@ -10,6 +10,7 @@ class Robotiq:
         self.dist =0
         self.n1 =0
         self.n2 =0
+        self.normal =0
         
 
     def isclose(self,a,b):
@@ -43,9 +44,16 @@ class Robotiq:
 
     def EEf(self):
         centr = (self.t1 +(self.t2 + self.t3)/2)/2
-        normal = np.cross((self.t1 -self.t2),(self.t1 -self.t3))
-        pose = centr + self.dist*normal/np.linalg.norm(normal)
+        self.normal = np.cross((self.t1 -self.t2),(self.t1 -self.t3))
+        pose = centr + self.dist*self.normal/np.linalg.norm(self.normal)
         return np.array(pose)
+    
+    def orientation(self):
+        roll = 0
+        yaw = math.atan2(self.normal[2],((self.normal[1])**2 + (self.normal[2]**2))**0.5)
+        pitch = math.atan2(self.normal[1],self.normal[0])
+        return [roll,pitch,yaw]
+
 
     def choose(self,triplet,normals):
         side1 = np.linalg.norm(triplet[0]-triplet[1])
@@ -63,7 +71,7 @@ class Robotiq:
                     self.t3 = triplet[0]
                     return True
         elif self.isclose(side1,side2):
-            print(f"side1={side1}")
+            #print(f"side1={side1}")
             if side1<18.8695779 and side1>0.1 and self.isclose(side3,7.302):
                if self.are_parallel(normals[0],normals[2]) and self.is_antiparallel(normals[0],normals[1]):
                     self.dist = self.EEFpose(side1,side3)
@@ -74,7 +82,7 @@ class Robotiq:
                     self.t3 = triplet[0]
                     return True
         elif self.isclose(side1,side3):
-            print(f"side3={side3}")
+            #print(f"side3={side3}")
             if side1<18.8695779 and side1>0.1 and self.isclose(side2,7.302):
                 if self.are_parallel(normals[2],normals[1]) and self.is_antiparallel(normals[0],normals[2]):
                     self.dist = self.EEFpose(side1,side2)
@@ -85,7 +93,7 @@ class Robotiq:
                     self.t3 = triplet[2]
                     return True
         elif self.isclose(side3,side2):
-            print(f"side2={side2}")
+            #print(f"side2={side2}")
             if side2<18.8695779 and side2>0.1 and self.isclose(side1,7.302):
                 if self.are_parallel(normals[0],normals[1]) and self.is_antiparallel(normals[0],normals[2]):
                     self.dist = self.EEFpose(side2,side1)
